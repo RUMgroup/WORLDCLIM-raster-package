@@ -1,0 +1,170 @@
+#EXTRACTING DATA FROM THE WORLDCLIM DATASET
+
+sampledata<-read.table("byhostdata.txt", header=TRUE)	
+
+#Assign more RAM to R if necessary
+memory.limit(100000) 
+
+
+#Load necessary packages
+
+library(raster)		
+library(rgdal)
+
+
+#Stack a raster with variables of interest from the bioclim dataset 
+
+
+bioclim<-getData('worldclim', var='bio', res=2.5)
+#If online accessing data with 0.5 resolution you also need to specify a lon and lat for a specific tile.
+# or work offline using downloaded files with bioclim<-stack(raster('bio1.bil'),raster('bio2.bil'))
+
+#Use the lowest resolution for global maps or the highest for local maps or data analysis
+#If using downloaded bil files, the accompanying hdr files must also be present in the same directory for this script to work.
+
+#Plotting individual layers:
+
+
+#Produce a text output file 'output.txt'
+
+#Define region of interest using coordinates via the zoom and crop functions
+#Crop raster to a single pixel for each layer and extract the data for one of the edges of that pixel (in this case the min)
+#Choose column headings for the output table
+
+l=sampledata$longitude
+
+a=sampledata$latitude
+
+climdata<-file(paste("climdata.txt"), open="w")
+cat("hostName","latitude","longitude","Xannualtemp","xdiurnalrange","isothermality","tempseasonality","maxtemp","mincoldtemp","xtemprange","xtempwetquart","xtempdryquart","xtemphotquart","xtempcoldquart","xprec","precwetmonth","precdrymonth","precseasonality","precwetquart","precdryquart","prechotquart","preccoldquart","\n", file="climdata.txt", sep="\t", append=TRUE)
+
+
+for (n in 1:166){
+c<-c(l[n],l[n]+0.01,a[n],a[n]+0.01)
+
+e<-extent(c)						
+
+zoom<-crop(bioclim, e)					
+
+
+cat((paste(sampledata$hostName[n])),ymin(zoom),xmin(zoom),minValue(zoom$bio1), minValue(zoom$bio2),minValue(zoom$bio3),minValue(zoom$bio4),minValue(zoom$bio5), minValue(zoom$bio6), minValue(zoom$bio7), minValue(zoom$bio8), minValue(zoom$bio9), minValue(zoom$bio10), minValue(zoom$bio11), minValue(zoom$bio12), minValue(zoom$bio13), minValue(zoom$bio14), minValue(zoom$bio15), minValue(zoom$bio16), minValue(zoom$bio17), minValue(zoom$bio18), minValue(zoom$bio19), "\n", file="climdata.txt", sep="\t", fill=FALSE, labels=NULL, append=TRUE)
+} 
+
+
+#Wait for the file writing to be complete before proceeding
+
+climdata<-read.table("climdata.txt", header=TRUE)
+
+head(climdata)
+
+tail(climdata)
+
+
+
+#Append the new data to your original data table by merging on a common field (in this case the code for each tree)
+joined<-merge(sampledata,climdata, by="hostName") 
+attach(joined)
+
+		
+#Temperature values in Celsius are multipled by 10 for bioclim variables so need to be divided before visualising
+
+
+list(hostName,(xannualtemp/10))
+
+
+
+#BIO1 = Annual Mean Temperature
+
+#BIO2 = Mean Diurnal Range (Mean of monthly (max temp - min temp))
+
+#BIO3 = Isothermality (BIO2/BIO7) (* 100)
+
+#BIO4 = Temperature Seasonality (standard deviation *100)
+
+#BIO5 = Max Temperature of Warmest Month
+
+#BIO6 = Min Temperature of Coldest Month
+
+#BIO7 = Temperature Annual Range (BIO5-BIO6)
+
+#BIO8 = Mean Temperature of Wettest Quarter
+
+#BIO9 = Mean Temperature of Driest Quarter
+
+#BIO10 = Mean Temperature of Warmest Quarter
+
+#BIO11 = Mean Temperature of Coldest Quarter
+
+#BIO12 = Annual Precipitation
+
+#BIO13 = Precipitation of Wettest Month
+
+#BIO14 = Precipitation of Driest Month
+
+#BIO15 = Precipitation Seasonality (Coefficient of Variation)
+
+#BIO16 = Precipitation of Wettest Quarter
+
+#BIO17 = Precipitation of Driest Quarter
+
+#BIO18 = Precipitation of Warmest Quarter
+
+#BIO19 = Precipitation of Coldest Quarter
+
+
+
+#Write a new merged table 
+
+byhostbioclim<-file(paste("byhostbioclim.txt"), open="w")
+cat("hostName", "ScerCount","SparCount","otherAmplifiedITScount","otherGrowthCount","sampleCount","
+site","species","hostType","latitude.x","longitude.x","latitude.y","longitude.y","elevation","circum","pH","Xannualtemp","tempseasonality","maxtemp","xprec","precdrymonth","precseasonality","\n", sep="\t",file="byhostbioclim.txt",append=TRUE)
+for (n in 1:166){
+cat((paste(joined$hostName[n])),(paste(joined$ScerCount[n])),(paste(joined$SparCount[n])), (paste(joined$otherAmplifiedITScount[n])),(paste(joined$otherGrowthCount[n])),(paste(joined$sampleCount[n])),(paste(joined$site[n])),(paste(joined$species[n])), (paste(joined$hostType[n])),(paste(joined$latitude.x[n])),(paste(joined$longitude.x[n])),(paste(joined$latitude.y[n])),(paste(joined$longitude.y[n])),(paste(joined$elevation[n])),(paste(joined$circum[n])),(paste(joined$pH[n])),(paste(joined$Xannualtemp[n])),(paste(joined$tempseasonality[n])),(paste(joined$maxtemp[n])), (paste(joined$xprec[n])),(paste(joined$precdrymonth[n])),(paste(joined$precseasonality[n])),"\n", file="byhostbioclim.txt", sep="\t", fill=FALSE, labels=NULL, append=TRUE)
+}   
+
+
+
+#PLOT PARAMETER RANGE
+tab<-read.table("ourstudy.txt", header=TRUE)
+attach(tab)
+
+library(maps)
+library(mapdata)
+library(mapproj)
+library(scales)
+library(fields)
+library(plotrix)
+
+outline<-as.raster('FullWorld_30.dbf')
+bioclim<-stack(raster('bio5.bil'))
+par(mar=c(0,0,0,2))
+breakpoints <- c(18,22,28,31)
+colors <- c("palegoldenrod","salmon","palegoldenrod")
+plot((bioclim$bio5/10),breaks=breakpoints,col=colors,xaxt='n',horizontal=TRUE,xlim=c(-170,180),ylim=c(-55,85),cex.lab=1.5, cex.axis=1.5, cex.main=1.5, cex.sub=1.5)
+map(xlim=c(-170,180),ylim=c(-65,85),add=T)
+par(xpd=TRUE)
+
+legend(-135,-85,legend=expression(paste("Temp (",degree,"C)")),col="white",title="",bty="n")
+longitude<-as.numeric(as.character(longitude))
+par(pch=16, col="navy")						
+for (s in unique(site[Spar==1])) {points(mean(longitude[site==s]),mean(latitude[site==s]),bg="navy")}
+legend(-160,-30, "Species X",col=c("navy"),pch=16,title="",bty="n")
+
+
+#ADDING EXTERNAL DATA POINTS
+tab2<-read.table("manystudies.txt", header=TRUE)
+attach(tab2)
+outline<-as.raster('FullWorld_30.dbf')
+bioclim<-stack(raster('bio5.bil'))
+par(mar=c(0,0,0,2))
+breakpoints <- c(18,22,28,31)
+colors <- c("palegoldenrod","salmon","palegoldenrod")
+plot((bioclim$bio5/10),breaks=breakpoints,col=colors,xaxt='n',horizontal=TRUE,xlim=c(-170,180),ylim=c(-55,85),cex.lab=1.5, cex.axis=1.5, cex.main=1.5, cex.sub=1.5)
+map(xlim=c(-170,180),ylim=c(-65,85),add=T)
+par(xpd=TRUE)
+
+legend(-135,-85,legend=expression(paste("Temp (",degree,"C)")),col="navy",title="",bty="n")
+longitude<-as.numeric(as.character(longitude))
+par(pch=21, col="black")						
+for (s in unique(site[Spar==1])) {points(mean(longitude[site==s]),mean(latitude[site==s]),bg="navy",pch=21)}
+legend(-160,-30, "Species X",col=c("black"),pch=21,bg="navy",title="",bty="n")
